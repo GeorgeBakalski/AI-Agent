@@ -2,6 +2,8 @@ import os, argparse
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
+from prompts import system_prompt
+from call_function import available_functions
 
 load_dotenv()
 api_key = os.environ.get("GEMINI_API_KEY")
@@ -19,8 +21,13 @@ def main():
 
     client = genai.Client(api_key=api_key)
     response = client.models.generate_content(
-    model='gemini-2.5-flash', contents= messages
+        model='gemini-2.5-flash', 
+        contents= messages,
+        config=types.GenerateContentConfig(
+            tools=[available_functions], system_instruction=system_prompt
+            )
     )
+
     metadata = response.usage_metadata
     if metadata  is None:
         raise RuntimeError("Response token count not found. Failed API request.")
@@ -31,7 +38,14 @@ def main():
         print(f"User prompt: {args.user_prompt}")
         print(f"Prompt tokens: {prompt_tokens}")
         print(f"Response tokens: {response_tokens}")
-    print(f"Response: \n{response.text}")
+
+    if response.function_calls is None:
+        print(f"Response: \n{response.text}")
+        return 
+    
+    for function_call in  response.function_calls:
+        print(f"Calling function: {function_call.name}({function_call.args})")
+    
 
 if __name__ == "__main__":
     main()
